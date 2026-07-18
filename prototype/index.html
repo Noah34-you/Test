@@ -1,0 +1,865 @@
+<title>Revenue Recovery — Ops Console (V0)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ============ tokens ============ */
+  :root{
+    --bg:#f4f5f7; --surface:#ffffff; --surface2:#eef0f3; --border:#e2e5e9; --border-strong:#c7cdd4;
+    --ink:#1a2330; --ink2:#57616e; --ink3:#8a939e;
+    --accent:#2557d6; --accent-ink:#ffffff; --accent-soft:#e8eefb; --accent-line:#b7c8ef;
+    --good:#1a7f4b; --good-soft:#e3f2ea; --warn:#a85408; --warn-soft:#fbeede; --crit:#c03028; --crit-soft:#fae7e5;
+    --sidebar:#151b23; --sidebar-line:#242d38; --sidebar-ink:#96a1ad; --sidebar-hi:#f2f5f8;
+    --bar:#7f9ce3; --bar-hi:#2557d6;
+    --shadow:0 1px 2px rgba(20,28,40,.06);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e1319; --surface:#151b23; --surface2:#1a212b; --border:#242d38; --border-strong:#33404e;
+      --ink:#e7ebf0; --ink2:#9aa5b1; --ink3:#68737f;
+      --accent:#7c9ff2; --accent-ink:#0e1319; --accent-soft:#1c2740; --accent-line:#33487c;
+      --good:#4cba82; --good-soft:#14291e; --warn:#e09452; --warn-soft:#2e2113; --crit:#e2726b; --crit-soft:#331715;
+      --bar:#3d5a9e; --bar-hi:#7c9ff2;
+      --shadow:none;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1319; --surface:#151b23; --surface2:#1a212b; --border:#242d38; --border-strong:#33404e;
+    --ink:#e7ebf0; --ink2:#9aa5b1; --ink3:#68737f;
+    --accent:#7c9ff2; --accent-ink:#0e1319; --accent-soft:#1c2740; --accent-line:#33487c;
+    --good:#4cba82; --good-soft:#14291e; --warn:#e09452; --warn-soft:#2e2113; --crit:#e2726b; --crit-soft:#331715;
+    --bar:#3d5a9e; --bar-hi:#7c9ff2;
+    --shadow:none;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f5f7; --surface:#ffffff; --surface2:#eef0f3; --border:#e2e5e9; --border-strong:#c7cdd4;
+    --ink:#1a2330; --ink2:#57616e; --ink3:#8a939e;
+    --accent:#2557d6; --accent-ink:#ffffff; --accent-soft:#e8eefb; --accent-line:#b7c8ef;
+    --good:#1a7f4b; --good-soft:#e3f2ea; --warn:#a85408; --warn-soft:#fbeede; --crit:#c03028; --crit-soft:#fae7e5;
+    --bar:#7f9ce3; --bar-hi:#2557d6;
+    --shadow:0 1px 2px rgba(20,28,40,.06);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
+  @media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation:none!important;transition:none!important} }
+
+  /* ============ shell ============ */
+  .app{display:flex;min-height:100vh}
+  .rail{width:216px;flex:none;background:var(--sidebar);color:var(--sidebar-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .rail .brand{padding:18px 18px 14px;border-bottom:1px solid var(--sidebar-line)}
+  .brand .word{color:var(--sidebar-hi);font-weight:650;font-size:14px;letter-spacing:.01em}
+  .brand .word span{color:#5f86e8}
+  .brand .co{font:11px/1.4 var(--mono);color:var(--sidebar-ink);margin-top:3px}
+  .rail nav{padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+  .rail .sect{font:10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#5c6772;padding:14px 10px 6px}
+  .rail a.nv{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;color:var(--sidebar-ink);font-size:13.5px}
+  .rail a.nv:hover{background:#1d2530;color:var(--sidebar-hi);text-decoration:none}
+  .rail a.nv.on{background:#232d3a;color:var(--sidebar-hi)}
+  .rail a.nv .ic{width:16px;text-align:center;flex:none;opacity:.85}
+  .rail a.nv .n{margin-left:auto;font:11px/1 var(--mono);background:#2c3745;color:#c8d2dd;padding:3px 6px;border-radius:9px}
+  .rail .foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--sidebar-line);font:10.5px/1.6 var(--mono);color:#5c6772}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .top{display:flex;align-items:center;gap:14px;padding:12px 26px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5}
+  .top .biz{font-weight:600;font-size:13.5px}
+  .top .biz small{display:block;font:10.5px/1.3 var(--mono);color:var(--ink3);font-weight:400}
+  .top .sp{flex:1}
+  .content{padding:22px 26px 60px;max-width:1180px;width:100%;margin:0 auto}
+
+  /* ============ primitives ============ */
+  .h1{font-size:19px;font-weight:650;letter-spacing:-.01em;margin:0}
+  .sub{color:var(--ink2);font-size:13px;margin:4px 0 0}
+  .pghead{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .pghead .sp{flex:1}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
+  .card .chead{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--border)}
+  .card .chead h3{margin:0;font-size:13px;font-weight:600}
+  .card .chead .sp{flex:1}
+  .card .cbody{padding:14px 16px}
+  .lbl{font:10px/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--ink3)}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:960px){.g2,.g3{grid-template-columns:1fr}}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font:11px/1 var(--mono);padding:4px 8px;border-radius:999px;border:1px solid var(--border);color:var(--ink2);background:var(--surface2);white-space:nowrap}
+  .chip.good{background:var(--good-soft);color:var(--good);border-color:transparent}
+  .chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+  .chip.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+  .chip.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);font-size:12.5px;font-weight:550}
+  .btn:hover{background:var(--surface2)}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.pri:hover{filter:brightness(1.06)}
+  .btn.sm{padding:4px 9px;font-size:11.5px}
+  .btn:disabled{opacity:.5;cursor:default}
+
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t th{text-align:left;font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+  table.t td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  table.t tr:last-child td{border-bottom:0}
+  table.t tr.rowlink{cursor:pointer}
+  table.t tr.rowlink:hover td{background:var(--surface2)}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  .tscroll{overflow-x:auto}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+  @media(max-width:960px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 16px;box-shadow:var(--shadow)}
+  .kpi .v{font:600 22px/1.2 var(--mono);font-variant-numeric:tabular-nums;margin-top:7px;letter-spacing:-.01em}
+  .kpi .d{font-size:11.5px;color:var(--ink2);margin-top:4px}
+  .kpi .d b{font-weight:600}
+  .kpi.risk .v{color:var(--warn)} .kpi.won .v{color:var(--good)}
+
+  .toast{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;flex-direction:column;gap:8px}
+  .toast .tst{background:var(--sidebar);color:#e8edf3;font-size:12.5px;padding:10px 14px;border-radius:7px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:340px}
+  .toast .tst b{color:#fff}
+
+  /* attention queue */
+  .att{display:flex;flex-direction:column}
+  .att .it{display:flex;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+  .att .it:last-child{border-bottom:0}
+  .att .it:hover{background:var(--surface2)}
+  .att .stripe{width:3px;align-self:stretch;border-radius:2px;flex:none}
+  .att .stripe.crit{background:var(--crit)} .att .stripe.warn{background:var(--warn)} .att .stripe.acc{background:var(--accent)}
+  .att .who{min-width:0;flex:1}
+  .att .who .nm{font-weight:600;font-size:13px}
+  .att .who .why{color:var(--ink2);font-size:12px;margin-top:1px}
+  .att .act{flex:none}
+
+  /* urgency meter */
+  .urg{display:inline-flex;align-items:center;gap:7px}
+  .urg .cells{display:inline-flex;gap:2px}
+  .urg .c{width:5px;height:12px;border-radius:1.5px;background:var(--surface2);border:1px solid var(--border)}
+  .urg .c.f{border-color:transparent}
+  .urg.hi .c.f{background:var(--crit)} .urg.md .c.f{background:var(--warn)} .urg.lo .c.f{background:var(--ink3)}
+  .urg .sc{font:11px/1 var(--mono);color:var(--ink2)}
+
+  /* conversation / phone */
+  .thread{display:flex;flex-direction:column;gap:10px}
+  .ev{display:flex;gap:10px;align-items:flex-start}
+  .ev .tk{font:10.5px/1.7 var(--mono);color:var(--ink3);width:74px;flex:none;text-align:right;padding-top:4px}
+  .ev .body{flex:1;min-width:0}
+  .bubble{display:inline-block;max-width:78%;padding:8px 12px;border-radius:10px;font-size:13px}
+  .bubble.cust{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:3px}
+  .bubble.us{background:var(--accent-soft);border:1px solid var(--accent-line);border-bottom-right-radius:3px}
+  .ev.right .body{display:flex;flex-direction:column;align-items:flex-end}
+  .sys{font:11.5px/1.5 var(--mono);color:var(--ink2);background:var(--surface2);border:1px dashed var(--border-strong);padding:6px 10px;border-radius:6px;display:inline-block}
+  .sys b{color:var(--ink)}
+  .bfrom{font:10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:0 2px 3px}
+
+  .phone{width:300px;flex:none;background:var(--surface);border:1px solid var(--border-strong);border-radius:18px;padding:12px 12px 16px;box-shadow:var(--shadow)}
+  .phone .pstat{display:flex;justify-content:space-between;font:10.5px/1 var(--mono);color:var(--ink3);padding:2px 6px 10px;border-bottom:1px solid var(--border);margin-bottom:10px}
+  .phone .msgs{display:flex;flex-direction:column;gap:8px;min-height:280px}
+  .phone .bubble{max-width:88%}
+  .phone .meta{font:9.5px/1 var(--mono);color:var(--ink3);margin:2px 4px}
+
+  /* flow sim */
+  .sim{display:flex;gap:18px;align-items:flex-start}
+  .sim .log{flex:1;min-width:0}
+  .simstep{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+  .simstep:last-child{border-bottom:0}
+  .simstep .t{font:10.5px/1.8 var(--mono);color:var(--ink3);width:70px;flex:none;text-align:right}
+  .simstep .tt{font-weight:600;font-size:13px}
+  .simstep .dd{color:var(--ink2);font-size:12.5px;margin-top:1px}
+  .simstep.pending{opacity:.32}
+  @media(max-width:860px){.sim{flex-direction:column}.phone{width:100%}}
+
+  /* sequence */
+  .seq{display:flex;flex-direction:column}
+  .seqstep{display:flex;gap:14px;position:relative;padding:0 0 22px 0}
+  .seqstep .rail2{width:26px;flex:none;display:flex;flex-direction:column;align-items:center}
+  .seqstep .nd{width:12px;height:12px;border-radius:50%;border:2px solid var(--border-strong);background:var(--surface);z-index:1;flex:none;margin-top:3px}
+  .seqstep .ln{flex:1;width:2px;background:var(--border)}
+  .seqstep:last-child .ln{display:none}
+  .seqstep.done .nd{background:var(--good);border-color:var(--good)}
+  .seqstep.now .nd{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  .seqstep .sb{flex:1;min-width:0;margin-top:-2px}
+  .seqstep .when{font:10.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .seqstep .what{font-weight:600;font-size:13px;margin:3px 0 2px}
+  .seqstep .msg{font-size:12.5px;color:var(--ink2);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-top:5px;max-width:560px}
+
+  /* probability bar */
+  .prob{display:inline-flex;align-items:center;gap:8px;min-width:110px}
+  .prob .tr{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;min-width:56px}
+  .prob .fl{display:block;height:100%;border-radius:3px;background:var(--bar-hi)}
+  .prob.lo .fl{background:var(--warn)}
+  .prob .pv{font:11px/1 var(--mono);color:var(--ink2);width:32px;text-align:right}
+
+  /* charts */
+  .chart{padding:6px 2px}
+  .cbars{display:flex;align-items:flex-end;gap:14px;height:150px;padding:0 4px;border-bottom:1px solid var(--border)}
+  .cb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative}
+  .cb .bar{width:26px;max-width:60%;background:var(--bar);border-radius:4px 4px 0 0;position:relative}
+  .cb.hi .bar{background:var(--bar-hi)}
+  .cb .bv{font:10.5px/1 var(--mono);color:var(--ink2);margin-bottom:5px}
+  .cxl{display:flex;gap:14px;padding:6px 4px 0}
+  .cxl span{flex:1;text-align:center;font:10.5px/1 var(--mono);color:var(--ink3)}
+  .hbars{display:flex;flex-direction:column;gap:9px}
+  .hb{display:grid;grid-template-columns:110px 1fr 34px;gap:10px;align-items:center}
+  .hb .hl{font-size:12.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hb .tr{height:14px;background:var(--surface2);border-radius:0 4px 4px 0;overflow:hidden}
+  .hb .fl{display:block;height:100%;background:var(--bar);border-radius:0 4px 4px 0}
+  .hb:first-child .fl{background:var(--bar-hi)}
+  .hb .hv{font:11px/1 var(--mono);color:var(--ink2);text-align:right}
+  [data-tip]{position:relative}
+  [data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--sidebar);color:#e8edf3;font:11px/1.4 var(--mono);padding:5px 8px;border-radius:5px;white-space:nowrap;z-index:20}
+  details.dtable{margin-top:10px}
+  details.dtable summary{font:11px/1 var(--mono);color:var(--ink2);cursor:pointer}
+  details.dtable table{margin-top:8px}
+
+  /* settings */
+  .set .row{display:grid;grid-template-columns:220px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}
+  .set .row:last-child{border-bottom:0}
+  .set .rl b{font-size:13px;font-weight:600;display:block}
+  .set .rl span{font-size:12px;color:var(--ink2)}
+  @media(max-width:860px){.set .row{grid-template-columns:1fr}}
+  .hoursrow{display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px}
+  .hoursrow .dy{width:44px;font-family:var(--mono);font-size:11.5px;color:var(--ink2)}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+  .field input[type=text],.field textarea,.field select{font:13px var(--sans);color:var(--ink);background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;padding:7px 10px;width:100%;max-width:520px}
+  .field textarea{font-family:var(--mono);font-size:12px;line-height:1.55;resize:vertical}
+  .radio{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border);border-radius:7px;margin-bottom:8px;max-width:560px;cursor:pointer}
+  .radio.on{border-color:var(--accent);background:var(--accent-soft)}
+  .radio b{font-size:13px;display:block}
+  .radio span{font-size:12px;color:var(--ink2)}
+  .ckrow{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13px}
+
+  .backlink{font:11.5px/1 var(--mono);color:var(--ink2);display:inline-block;margin-bottom:12px}
+  .empty{padding:22px 16px;text-align:center;color:var(--ink3);font-size:12.5px}
+  .banner{display:flex;gap:10px;align-items:center;border:1px solid var(--accent-line);background:var(--accent-soft);border-radius:8px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+  .banner .mono{color:var(--ink2)}
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="word">Revenue<span>Recovery</span></div>
+      <div class="co">V0 · workflow prototype</div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="foot">Demo data only.<br>Nothing here is live.<br><button class="btn sm" id="themeBtn" style="margin-top:8px">Toggle theme</button></div>
+  </aside>
+  <div class="main">
+    <div class="top">
+      <div class="biz">Reyes Plumbing &amp; Rooter<small>San Jose, CA · (408) 555-0177</small></div>
+      <span class="chip warn"><span class="dot"></span>After hours · text-back active</span>
+      <div class="sp"></div>
+      <span class="mono" style="font-size:11px;color:var(--ink3)">Thu Jul 17 · 9:58 PM</span>
+    </div>
+    <div class="content" id="view"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =================== seed data =================== */
+const fmt$ = n => '$' + n.toLocaleString('en-US');
+
+const LEADS = [
+  {id:'L-1041', name:'Dana Whitfield', phone:'(408) 555-2214', addr:'1170 Curtner Ave, San Jose', service:'Water heater — no hot water', source:'After-hours call', urgency:9, value:2800, status:'Appt. requested', respondedIn:'18s', created:'Yesterday 9:42 PM', lastContact:'Yesterday 9:51 PM',
+    summary:'Called 9:42 PM, no answer (25s). Auto-text sent at +18s; customer replied. 50-gal gas water heater, ~11 yrs old, fully out of hot water since this evening. Household of 4, no leak visible at the base. Not a tenant — owner-occupied. Offered tomorrow 8–10 AM or 10–12; customer picked 8–10 AM, pending office confirmation.',
+    nextAction:{label:'Confirm 8–10 AM appointment and dispatch', kind:'confirm'},
+    appt:'Requested · Fri Jul 18, 8–10 AM (unconfirmed)', seqStep:1, recording:true,
+    thread:[
+      {t:'9:42:03 PM', who:'sys', txt:'Inbound call from (408) 555-2214 · rang 25s · no answer'},
+      {t:'9:42:21 PM', who:'us', txt:'Sorry we missed you — this is Reyes Plumbing & Rooter. Are you calling about a repair or an estimate? Reply here and we’ll get right back to you.'},
+      {t:'9:44 PM', who:'cust', txt:'No hot water since tonight. Water heater is pretty old'},
+      {t:'9:44 PM', who:'us', txt:'Got it — no hot water is no fun. Is there any water leaking around the base of the tank?'},
+      {t:'9:45 PM', who:'cust', txt:'No leak that I can see'},
+      {t:'9:45 PM', who:'us', txt:'Good. Gas or electric, roughly how old, and what’s the service address?'},
+      {t:'9:47 PM', who:'cust', txt:'Gas, maybe 11 years? 1170 Curtner Ave San Jose'},
+      {t:'9:48 PM', who:'us', txt:'Thanks Dana. We can have a tech out tomorrow morning — 8–10 AM or 10–12. Which works?'},
+      {t:'9:50 PM', who:'cust', txt:'8-10 works'},
+      {t:'9:51 PM', who:'sys', txt:'Appointment requested (Fri 8–10 AM) · office notified · on-call SMS sent to M. Reyes'},
+    ],
+    tasks:[{txt:'Confirm morning slot with Dana', done:false},{txt:'Check 50-gal GE tank stock in van 2', done:false}],
+    notes:[{who:'System', txt:'Estimated ticket $2,400–$3,200 (replacement likely at 11 yrs).', t:'9:51 PM'}]},
+  {id:'L-1042', name:'Rosa Delgado', phone:'(408) 555-8830', addr:'44 Peral Ct, Campbell', service:'Suspected slab leak', source:'Website form', urgency:8, value:3400, status:'Qualified — needs office confirm', respondedIn:'52s', created:'Today 11:03 AM', lastContact:'Today 11:09 AM',
+    summary:'Web form at 11:03 AM. Text follow-up within 60s. Warm spot on the kitchen floor + water bill nearly doubled this cycle. No visible water. Home built 1968, slab foundation. Wants someone this week; flexible weekday afternoons.',
+    nextAction:{label:'Call to schedule leak detection (offer Wed PM)', kind:'call'},
+    appt:'Not scheduled', seqStep:2, recording:false,
+    thread:[
+      {t:'11:03 AM', who:'sys', txt:'Website form: "warm spot on floor, water bill doubled" · auto-reply queued'},
+      {t:'11:03:52 AM', who:'us', txt:'Hi Rosa, this is Reyes Plumbing — got your note about the warm spot and the water bill. That pattern can mean a slab leak. Quick q: any sound of running water when everything’s off?'},
+      {t:'11:07 AM', who:'cust', txt:'Yes actually, a faint hiss near the kitchen'},
+      {t:'11:09 AM', who:'us', txt:'That’s useful. We’d start with electronic leak detection ($285, credited toward repair). Weekday afternoons OK if we call to set a time?'},
+      {t:'11:09 AM', who:'cust', txt:'Yes afternoons work'},
+    ],
+    tasks:[{txt:'Offer Wed 1–3 PM leak detection', done:false}], notes:[]},
+  {id:'L-1037', name:'Tom Okafor', phone:'(669) 555-4402', addr:'88 N 5th St, San Jose', service:'Kitchen sink leak', source:'Missed call', urgency:6, value:380, status:'No reply — 2 texts sent', respondedIn:'22s', created:'Yesterday 6:48 PM', lastContact:'Today 8:00 AM',
+    summary:'Missed call yesterday evening; auto-text at +22s, no reply. Morning reminder sent 8:00 AM, no reply. Voicemail transcript mentions "leak under the kitchen sink, not urgent." Next: 2-hour reminder, then day-3 check-in.',
+    nextAction:{label:'Send afternoon reminder (step 3 of sequence)', kind:'text'},
+    appt:'Not scheduled', seqStep:3, recording:true,
+    thread:[
+      {t:'6:48 PM', who:'sys', txt:'Inbound call · rang out · voicemail left (0:19): "…got a leak under the kitchen sink, not an emergency, call me back…"'},
+      {t:'6:48:22 PM', who:'us', txt:'Sorry we missed you — Reyes Plumbing & Rooter. Got your voicemail about the kitchen sink. Want us to text you a time for tomorrow?'},
+      {t:'8:00 AM', who:'us', txt:'Morning Tom — still happy to get that sink leak handled today or tomorrow. Reply with a good time and we’ll lock it in.'},
+    ],
+    tasks:[], notes:[]},
+  {id:'L-1036', name:'Marcus Lee', phone:'(408) 555-9174', addr:'2321 Forest Ave, San Jose', service:'Tankless water heater estimate', source:'Website form', urgency:5, value:4600, status:'Quoted — in follow-up', respondedIn:'41s', created:'Jul 15, 2:11 PM', lastContact:'Today 8:00 AM',
+    summary:'Requested tankless conversion estimate via web form. Site visit done Jul 16; quote Q-2209 ($4,600) sent same day. Day-2 reminder went out this morning; opened the quote link twice, no reply yet. Mentioned comparing 2 other bids.',
+    nextAction:{label:'Day-3 quote reminder scheduled tomorrow 9 AM', kind:'none'},
+    appt:'Site visit completed Jul 16', seqStep:4, recording:false,
+    thread:[
+      {t:'Jul 15 2:11 PM', who:'sys', txt:'Website form: tankless estimate request'},
+      {t:'Jul 15 2:11 PM', who:'us', txt:'Hi Marcus — thanks for reaching out about going tankless. We can do a free site visit tomorrow. Morning or afternoon?'},
+      {t:'Jul 15 2:30 PM', who:'cust', txt:'Afternoon'},
+      {t:'Jul 16 4:40 PM', who:'sys', txt:'Quote Q-2209 sent — $4,600 (Navien NPE-240A, install + permit)'},
+      {t:'8:00 AM', who:'us', txt:'Morning Marcus — any questions on the tankless quote? Happy to walk through the line items or adjust scope.'},
+    ],
+    tasks:[], notes:[{who:'M. Reyes', txt:'Getting 2 other bids. Price sensitive — can drop to $4,350 if needed.', t:'Jul 16'}]},
+  {id:'L-1043', name:'Priya Natarajan', phone:'(650) 555-3318', addr:'506 Meridian Ave, San Jose', service:'Drain cleaning — kitchen line', source:'Missed call', urgency:7, value:450, status:'Booked — today 2:00 PM', respondedIn:'37s', created:'Today 12:22 PM', lastContact:'Today 12:31 PM',
+    summary:'Called during lunch rush, missed. Text-back at +37s; kitchen drain backing up into both sinks. Booked same-day 2:00 PM. Job completed — $450 collected.',
+    nextAction:{label:'None — job complete. Review request queued for 6 PM.', kind:'none'},
+    appt:'Completed today 2:00 PM · $450', seqStep:6, recording:false,
+    thread:[
+      {t:'12:22 PM', who:'sys', txt:'Inbound call · missed (office line busy)'},
+      {t:'12:22:37 PM', who:'us', txt:'Sorry we missed you — Reyes Plumbing & Rooter. Repair or estimate?'},
+      {t:'12:26 PM', who:'cust', txt:'Kitchen sink backing up on both sides, need someone today if possible'},
+      {t:'12:31 PM', who:'sys', txt:'Booked 2:00 PM · dispatched J. Silva · customer confirmed'},
+    ],
+    tasks:[], notes:[]},
+  {id:'L-1035', name:'Gary Mendes', phone:'(408) 555-7741', addr:'1815 Hamilton Ave, San Jose', service:'Sewer camera inspection', source:'Missed call', urgency:4, value:325, status:'Booked — Thu 9:00 AM', respondedIn:'29s', created:'Jul 14, 1:05 PM', lastContact:'Jul 14, 1:20 PM',
+    summary:'Pre-purchase sewer inspection for a home in escrow. Booked Thursday 9 AM. Reminder text scheduled for Wed 5 PM.',
+    nextAction:{label:'None — reminder automation handles it', kind:'none'},
+    appt:'Thu Jul 17, 9:00 AM · confirmed', seqStep:6, recording:true, thread:[
+      {t:'Jul 14 1:05 PM', who:'sys', txt:'Inbound call · missed · voicemail (0:31)'},
+      {t:'Jul 14 1:05 PM', who:'us', txt:'Sorry we missed you — Reyes Plumbing. Got your voicemail about a sewer scope for escrow. We have Thu 9 AM open — work?'},
+      {t:'Jul 14 1:20 PM', who:'cust', txt:'Thu 9am is perfect'},
+    ], tasks:[], notes:[]},
+];
+
+const QUOTES = [
+  {id:'Q-2188', name:'Elaine Fournier', job:'Whole-house repipe (PEX)', amount:8400, days:7, prob:35, last:'No contact since sent', suggest:'Call + text: offer to walk the scope, mention fall schedule filling', leadRef:null, sent:'Jul 10'},
+  {id:'Q-2195', name:'Bright Path Property Mgmt', job:'Multi-unit repipe — 4 units', amount:12600, days:12, prob:20, last:'Opened link Jul 8', suggest:'Escalate to owner call — PM firms respond to phone, not text', leadRef:null, sent:'Jul 5'},
+  {id:'Q-2209', name:'Marcus Lee', job:'Tankless conversion', amount:4600, days:2, prob:60, last:'Opened quote twice today', suggest:'Day-3 reminder tomorrow 9 AM (automated)', leadRef:'L-1036', sent:'Jul 16'},
+  {id:'Q-2211', name:'Ken Watanabe', job:'Water softener install', amount:2150, days:3, prob:55, last:'Replied "thinking about it" Jul 15', suggest:'Send financing option — $59/mo framing', leadRef:null, sent:'Jul 14'},
+  {id:'Q-2214', name:'Ahmed Safi', job:'Pressure regulator replacement', amount:980, days:1, prob:75, last:'Asked about warranty yesterday', suggest:'Answer warranty q + one-tap "book it" link', leadRef:null, sent:'Jul 16'},
+];
+
+const MISSED = [
+  {t:'Today 12:22 PM', who:'Priya Natarajan', out:'Recovered — booked 2:00 PM', k:'good'},
+  {t:'Today 7:14 AM', who:'(831) 555-0199 · unknown', out:'Texted +21s · no reply · in sequence', k:'warn'},
+  {t:'Yesterday 9:42 PM', who:'Dana Whitfield', out:'Recovered — appt. requested', k:'good'},
+  {t:'Yesterday 6:48 PM', who:'Tom Okafor', out:'Texted +22s · no reply after 2 attempts', k:'warn'},
+  {t:'Jul 15 4:03 PM', who:'(408) 555-6210 · unknown', out:'Texted · wrong number ("no thanks")', k:'mut'},
+];
+
+const SEQ = [
+  {when:'T+60 seconds', what:'Missed-call / new-lead text', msg:'Sorry we missed you — this is Reyes Plumbing & Rooter. Are you calling about a repair or an estimate? Reply here and we’ll get right back to you.'},
+  {when:'T+2 hours', what:'Reminder if no reply', msg:'Just checking back — want us to hold a time for you tomorrow? We have morning and afternoon slots open.'},
+  {when:'Next morning 8:00 AM', what:'Morning follow-up', msg:'Morning — still happy to help with your plumbing issue. Reply with a good time today or tomorrow and we’ll lock it in.'},
+  {when:'Day 3', what:'Quote reminder (if quoted)', msg:'Any questions on your quote? Happy to walk through line items, adjust scope, or set a start date.'},
+  {when:'Day 7', what:'Final follow-up, then archive', msg:'Last note from us — if the timing isn’t right, no problem. We’ll keep your quote on file for 90 days. Text anytime.'},
+];
+
+const APPTS = [
+  {t:'9:00 AM', who:'Gary Mendes', what:'Sewer camera inspection', st:'Completed', k:'good'},
+  {t:'2:00 PM', who:'Priya Natarajan', what:'Drain cleaning — kitchen line', st:'Completed · $450', k:'good'},
+  {t:'Fri 8–10 AM', who:'Dana Whitfield', what:'Water heater — no hot water', st:'UNCONFIRMED', k:'crit'},
+  {t:'Wed 1–3 PM', who:'Rosa Delgado', what:'Leak detection (proposed)', st:'Awaiting customer', k:'warn'},
+];
+
+const REPORT = {
+  months:['Feb','Mar','Apr','May','Jun','Jul'],
+  recovered:[6200, 8900, 11400, 14800, 16900, 18450],
+  sources:[['Google LSA',34],['Website form',22],['Missed calls',19],['Angi',11],['Referral',9]],
+};
+
+/* =================== app state =================== */
+const S = { reminded:{}, confirmed:{}, flow1:0, flow2:0 };
+
+function toast(html){
+  const t = document.createElement('div'); t.className='tst'; t.innerHTML = html;
+  document.getElementById('toast').appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+
+/* =================== nav =================== */
+const NAV = [
+  {sect:'Operate'},
+  {href:'#/dashboard', ic:'▦', label:'Dashboard'},
+  {href:'#/leads', ic:'☎', label:'Leads', badge:()=>LEADS.filter(l=>!/Booked|complete/i.test(l.status)).length},
+  {href:'#/quotes', ic:'⎘', label:'Open Quotes', badge:()=>QUOTES.filter(q=>!S.reminded[q.id]||true).length && QUOTES.length},
+  {href:'#/followups', ic:'↻', label:'Follow-up Engine'},
+  {sect:'Review'},
+  {href:'#/reporting', ic:'≣', label:'Reporting'},
+  {sect:'Configure'},
+  {href:'#/settings', ic:'⚙', label:'Settings'},
+  {sect:'Demo the flows'},
+  {href:'#/flow1', ic:'☾', label:'Flow 1 · After-hours call'},
+  {href:'#/flow2', ic:'⌨', label:'Flow 2 · Website form'},
+];
+function renderNav(){
+  const cur = location.hash || '#/dashboard';
+  document.getElementById('nav').innerHTML = NAV.map(n => n.sect
+    ? `<div class="sect">${n.sect}</div>`
+    : `<a class="nv ${cur.startsWith(n.href)?'on':''}" href="${n.href}"><span class="ic">${n.ic}</span>${n.label}${n.badge?`<span class="n">${n.badge()}</span>`:''}</a>`
+  ).join('');
+}
+
+/* =================== components =================== */
+const urgCls = u => u>=8?'hi':u>=5?'md':'lo';
+function urgMeter(u){
+  let c=''; for(let i=1;i<=10;i++) c+=`<span class="c ${i<=u?'f':''}"></span>`;
+  const word = u>=8?'Emergency':u>=5?'Priority':'Standard';
+  return `<span class="urg ${urgCls(u)}" title="Urgency ${u}/10 — ${word}"><span class="cells">${c}</span><span class="sc">${u}/10</span></span>`;
+}
+function statusChip(s){
+  const k = /Booked|Completed|complete/i.test(s)?'good' : /UNCONF|No reply|needs/i.test(s)?'warn' : /requested/i.test(s)?'acc':'';
+  return `<span class="chip ${k}">${s}</span>`;
+}
+function probBar(p){ return `<span class="prob ${p<40?'lo':''}"><span class="tr"><span class="fl" style="width:${p}%"></span></span><span class="pv">${p}%</span></span>`; }
+
+/* =================== views =================== */
+function vDashboard(){
+  const atRisk = QUOTES.reduce((a,q)=>a+q.amount,0) + 380; /* open quotes + unworked lead value */
+  const attention = [
+    {k:'crit', nm:'Dana Whitfield — water heater, no hot water', why:'Appointment requested for tomorrow 8–10 AM is UNCONFIRMED. Customer chose the slot 12 hours ago.', act:`<button class="btn sm pri" onclick="confirmAppt('L-1041');event.stopPropagation()">Confirm &amp; dispatch</button>`, go:'#/lead/L-1041'},
+    {k:'warn', nm:'Elaine Fournier — $8,400 repipe quote', why:'7 days since sent, zero contact. Suggested: call + text today.', act:`<button class="btn sm" onclick="sendReminder('Q-2188');event.stopPropagation()">Send reminder</button>`, go:'#/quotes'},
+    {k:'warn', nm:'Tom Okafor — kitchen sink leak', why:'No reply after 2 texts. Afternoon reminder is step 3 — or just call him.', act:`<button class="btn sm" onclick="location.hash='#/lead/L-1037';event.stopPropagation()">Open lead</button>`, go:'#/lead/L-1037'},
+    {k:'acc', nm:'Rosa Delgado — suspected slab leak', why:'Qualified via web form at 11:03 AM. Wants weekday afternoon — offer Wed 1–3 PM.', act:`<button class="btn sm" onclick="location.hash='#/lead/L-1042';event.stopPropagation()">Open lead</button>`, go:'#/lead/L-1042'},
+  ];
+  return `
+  <div class="pghead"><div><h1 class="h1">Dashboard</h1><p class="sub">Thursday, July 17 — 2 missed calls handled today, 1 appointment needs your confirmation.</p></div></div>
+  <div class="kpis">
+    <div class="kpi won"><div class="lbl">Revenue recovered · July</div><div class="v">${fmt$(18450)}</div><div class="d">from <b>11 jobs</b> that started as missed calls or stale quotes</div></div>
+    <div class="kpi risk"><div class="lbl">Potential revenue at risk</div><div class="v">${fmt$(atRisk)}</div><div class="d"><b>5 open quotes</b> + 1 unanswered lead</div></div>
+    <div class="kpi"><div class="lbl">Median response time</div><div class="v">42s</div><div class="d">was <b>3h 20m</b> before text-back went live</div></div>
+    <div class="kpi"><div class="lbl">Lead → booked conversion</div><div class="v">38%</div><div class="d">last 30 days · trade benchmark ~22%</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="chead"><h3>Needs attention now</h3><span class="chip mono">${attention.length}</span><div class="sp"></div><span class="lbl">ordered by urgency</span></div>
+    <div class="att">${attention.map(a=>`
+      <div class="it" onclick="location.hash='${a.go}'">
+        <span class="stripe ${a.k}"></span>
+        <div class="who"><div class="nm">${a.nm}</div><div class="why">${a.why}</div></div>
+        <div class="act">${a.act}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="chead"><h3>Today’s leads</h3><div class="sp"></div><a href="#/leads" class="mono" style="font-size:11px">All leads →</a></div>
+      <div class="tscroll"><table class="t">
+        <tr><th>Lead</th><th>Source</th><th>Urgency</th><th>Status</th></tr>
+        ${LEADS.filter(l=>l.created.startsWith('Today')||l.created.startsWith('Yesterday 9')).map(l=>`
+          <tr class="rowlink" onclick="location.hash='#/lead/${l.id}'">
+            <td><b>${l.name}</b><br><span style="font-size:11.5px;color:var(--ink2)">${l.service}</span></td>
+            <td style="font-size:12px;color:var(--ink2)">${l.source}</td>
+            <td>${urgMeter(l.urgency)}</td>
+            <td>${statusChip(l.status)}</td>
+          </tr>`).join('')}
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="chead"><h3>Missed calls</h3><div class="sp"></div><span class="lbl">last 72 hours</span></div>
+      <div class="tscroll"><table class="t">
+        <tr><th>When</th><th>Caller</th><th>Outcome</th></tr>
+        ${MISSED.map(m=>`<tr><td class="mono" style="font-size:11.5px;white-space:nowrap">${m.t}</td><td style="font-size:12.5px">${m.who}</td>
+          <td><span class="chip ${m.k==='good'?'good':m.k==='warn'?'warn':''}">${m.out}</span></td></tr>`).join('')}
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h3>Appointments</h3><div class="sp"></div><span class="lbl">today &amp; upcoming</span></div>
+      <div class="tscroll"><table class="t">
+        <tr><th>Time</th><th>Customer</th><th>Job</th><th>Status</th></tr>
+        ${APPTS.map(a=>`<tr><td class="mono" style="font-size:11.5px;white-space:nowrap">${a.t}</td><td><b>${a.who}</b></td>
+          <td style="font-size:12.5px;color:var(--ink2)">${a.what}</td><td><span class="chip ${a.k}">${S.confirmed['L-1041']&&a.who==='Dana Whitfield'?'Confirmed · dispatched':a.st}</span></td></tr>`).join('')}
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="chead"><h3>Follow-ups due</h3><div class="sp"></div><a href="#/followups" class="mono" style="font-size:11px">Engine →</a></div>
+      <div class="tscroll"><table class="t">
+        <tr><th>Due</th><th>Lead</th><th>Step</th><th></th></tr>
+        <tr><td class="mono" style="font-size:11.5px">2:48 PM</td><td><b>Tom Okafor</b></td><td style="font-size:12px;color:var(--ink2)">Step 3 · afternoon reminder</td><td style="text-align:right"><button class="btn sm" onclick="toast('<b>Reminder sent</b> to Tom Okafor (step 3 of 5).')">Send now</button></td></tr>
+        <tr><td class="mono" style="font-size:11.5px">Tomorrow 9 AM</td><td><b>Marcus Lee</b></td><td style="font-size:12px;color:var(--ink2)">Day-3 quote reminder · Q-2209</td><td style="text-align:right"><span class="chip">Automated</span></td></tr>
+        <tr><td class="mono" style="font-size:11.5px">Today 6 PM</td><td><b>Priya Natarajan</b></td><td style="font-size:12px;color:var(--ink2)">Review request (job complete)</td><td style="text-align:right"><span class="chip">Automated</span></td></tr>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="chead"><h3>Recent conversations</h3><div class="sp"></div><span class="lbl">newest first</span></div>
+    <div class="att">
+      ${[['L-1042','Rosa Delgado','“Yes afternoons work” · 11:09 AM','acc'],['L-1043','Priya Natarajan','Booked 2:00 PM · dispatched J. Silva · 12:31 PM','acc'],['L-1041','Dana Whitfield','“8-10 works” · 9:50 PM yesterday','acc']].map(c=>`
+      <div class="it" onclick="location.hash='#/lead/${c[0]}'"><span class="stripe ${c[3]}"></span>
+        <div class="who"><div class="nm">${c[1]}</div><div class="why">${c[2]}</div></div>
+        <div class="act"><span class="mono" style="font-size:11px;color:var(--ink3)">open thread →</span></div></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function vLeads(){
+  return `
+  <div class="pghead"><div><h1 class="h1">Leads</h1><p class="sub">Every call, text, and form — nothing slips. Click a row for the full thread.</p></div></div>
+  <div class="card"><div class="tscroll"><table class="t">
+    <tr><th>Lead</th><th>Service</th><th>Source</th><th>Created</th><th>Resp. time</th><th>Urgency</th><th>Est. value</th><th>Status</th></tr>
+    ${LEADS.map(l=>`<tr class="rowlink" onclick="location.hash='#/lead/${l.id}'">
+      <td><b>${l.name}</b><br><span class="mono" style="font-size:10.5px;color:var(--ink3)">${l.id}</span></td>
+      <td style="font-size:12.5px">${l.service}</td>
+      <td style="font-size:12px;color:var(--ink2)">${l.source}</td>
+      <td class="mono" style="font-size:11.5px;white-space:nowrap">${l.created}</td>
+      <td class="num" style="color:var(--good)">${l.respondedIn}</td>
+      <td>${urgMeter(l.urgency)}</td>
+      <td class="num">${fmt$(l.value)}</td>
+      <td>${statusChip(l.status)}</td></tr>`).join('')}
+  </table></div></div>`;
+}
+
+function vLead(id){
+  const l = LEADS.find(x=>x.id===id);
+  if(!l) return `<p>Lead not found.</p>`;
+  const confirmed = S.confirmed[l.id];
+  return `
+  <a class="backlink" href="#/leads">← All leads</a>
+  <div class="pghead">
+    <div>
+      <h1 class="h1">${l.name} <span class="mono" style="font-size:12px;color:var(--ink3);font-weight:400">${l.id}</span></h1>
+      <p class="sub">${l.service} · ${l.source} · created ${l.created}</p>
+    </div>
+    <div class="sp"></div>
+    ${urgMeter(l.urgency)}
+    ${statusChip(confirmed?'Booked — confirmed':l.status)}
+  </div>
+
+  ${l.nextAction.kind!=='none'?`
+  <div class="banner">
+    <b>Next action:</b> ${l.nextAction.label}
+    <div class="sp" style="flex:1"></div>
+    ${l.nextAction.kind==='confirm'?`<button class="btn pri sm" onclick="confirmAppt('${l.id}')" ${confirmed?'disabled':''}>${confirmed?'Confirmed ✓':'Confirm & dispatch'}</button>`:''}
+    ${l.nextAction.kind==='call'?`<button class="btn pri sm" onclick="toast('<b>Calling ${l.name}…</b> (prototype — no call placed)')">Call now</button>`:''}
+    ${l.nextAction.kind==='text'?`<button class="btn pri sm" onclick="toast('<b>Reminder sent</b> to ${l.name}.')">Approve & send text</button>`:''}
+    <button class="btn sm" onclick="toast('Snoozed until tomorrow 8 AM.')">Snooze</button>
+  </div>`:''}
+
+  <div class="grid" style="grid-template-columns:1.6fr 1fr">
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div class="card">
+        <div class="chead"><h3>Conversation timeline</h3><div class="sp"></div><span class="lbl">calls · texts · system</span></div>
+        <div class="cbody"><div class="thread">
+          ${l.thread.map(m=>{
+            if(m.who==='sys') return `<div class="ev"><div class="tk">${m.t}</div><div class="body"><span class="sys">${m.txt}</span></div></div>`;
+            if(m.who==='cust') return `<div class="ev"><div class="tk">${m.t}</div><div class="body"><div class="bfrom">${l.name.split(' ')[0]}</div><span class="bubble cust">${m.txt}</span></div></div>`;
+            return `<div class="ev right"><div class="tk">${m.t}</div><div class="body"><div class="bfrom">Reyes (auto)</div><span class="bubble us">${m.txt}</span></div></div>`;
+          }).join('')}
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <input type="text" placeholder="Type a reply — sends as SMS from (408) 555-0177" style="flex:1;font:13px var(--sans);color:var(--ink);background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;padding:8px 10px" id="reply-${l.id}">
+          <button class="btn pri" onclick="toast('<b>Sent.</b> Reply will appear in this thread.')">Send</button>
+        </div>
+        </div>
+      </div>
+      ${l.recording?`
+      <div class="card"><div class="chead"><h3>Call recording</h3><div class="sp"></div><span class="lbl">original inbound call</span></div>
+        <div class="cbody" style="display:flex;align-items:center;gap:12px">
+          <button class="btn sm pri" onclick="toast('Playing recording… (prototype)')">▶ Play</button>
+          <div style="flex:1;height:26px;background:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px);border-radius:4px"></div>
+          <span class="mono" style="font-size:11px;color:var(--ink2)">0:25</span>
+          <button class="btn sm" onclick="toast('Transcript opened. (prototype)')">Transcript</button>
+        </div></div>`:''}
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div class="card"><div class="chead"><h3>Summary</h3><div class="sp"></div><span class="lbl">auto-generated · editable</span></div>
+        <div class="cbody" style="font-size:13px;color:var(--ink2);line-height:1.6">${l.summary}</div></div>
+      <div class="card"><div class="chead"><h3>Details</h3></div>
+        <div class="cbody" style="display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:12.5px">
+          <span class="lbl" style="align-self:center">Phone</span><span class="mono">${l.phone}</span>
+          <span class="lbl" style="align-self:center">Address</span><span>${l.addr}</span>
+          <span class="lbl" style="align-self:center">Est. value</span><span class="mono">${fmt$(l.value)}</span>
+          <span class="lbl" style="align-self:center">First response</span><span class="mono" style="color:var(--good)">${l.respondedIn}</span>
+          <span class="lbl" style="align-self:center">Appointment</span><span>${confirmed?'Fri Jul 18, 8–10 AM · confirmed ✓':l.appt}</span>
+          <span class="lbl" style="align-self:center">Sequence</span><span>Step ${l.seqStep>=6?'complete':l.seqStep+' of 5'} · <a href="#/followups">view engine</a></span>
+        </div></div>
+      <div class="card"><div class="chead"><h3>Tasks</h3><div class="sp"></div><button class="btn sm" onclick="toast('Task added. (prototype)')">+ Add</button></div>
+        <div class="cbody">${l.tasks.length?l.tasks.map((t,i)=>`
+          <label class="ckrow"><input type="checkbox" ${t.done?'checked':''} onchange="toast('Task updated.')"> ${t.txt}</label>`).join(''):'<div class="empty">No open tasks</div>'}</div></div>
+      <div class="card"><div class="chead"><h3>Notes</h3><div class="sp"></div><button class="btn sm" onclick="toast('Note saved. (prototype)')">+ Note</button></div>
+        <div class="cbody">${l.notes.length?l.notes.map(n=>`
+          <div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)"><b>${n.who}</b> <span class="mono" style="font-size:10.5px;color:var(--ink3)">${n.t}</span><br><span style="color:var(--ink2)">${n.txt}</span></div>`).join(''):'<div class="empty">No notes yet</div>'}</div></div>
+    </div>
+  </div>`;
+}
+
+function vFollowups(){
+  const inSeq = [
+    {name:'Tom Okafor', id:'L-1037', step:3, next:'Today 2:48 PM — afternoon reminder'},
+    {name:'Marcus Lee', id:'L-1036', step:4, next:'Tomorrow 9:00 AM — day-3 quote reminder'},
+    {name:'(831) 555-0199 · unknown', id:null, step:2, next:'Today 9:14 AM — sent, no reply. Next: tomorrow 8 AM'},
+    {name:'Dana Whitfield', id:'L-1041', step:1, next:'Paused — appointment requested (human confirm pending)'},
+  ];
+  return `
+  <div class="pghead"><div><h1 class="h1">Follow-up Engine</h1><p class="sub">The default sequence every lead enters. It stops the moment a human replies, books, or opts out.</p></div>
+  <div class="sp"></div><button class="btn" onclick="toast('Sequence editing lands after pilot feedback. What would you change? Tell us.')">Edit sequence</button></div>
+  <div class="grid" style="grid-template-columns:1.2fr 1fr">
+    <div class="card"><div class="chead"><h3>Default sequence — “Missed call / new lead”</h3><div class="sp"></div><span class="chip good"><span class="dot"></span>Active</span></div>
+      <div class="cbody"><div class="seq">
+        ${SEQ.map((s,i)=>`
+        <div class="seqstep ${i<1?'done':i===1?'now':''}">
+          <div class="rail2"><span class="nd"></span><span class="ln"></span></div>
+          <div class="sb">
+            <div class="when">${s.when}</div>
+            <div class="what">${s.what}</div>
+            <div class="msg">${s.msg}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+      <p style="font-size:12px;color:var(--ink2);margin:6px 0 0">Exit rules: customer replies → sequence pauses for human/AI conversation · appointment booked → switches to reminder track · “STOP” → opt-out honored immediately and number suppressed.</p>
+      </div></div>
+    <div class="card"><div class="chead"><h3>Currently in sequence</h3><span class="chip mono">${inSeq.length}</span></div>
+      <div class="tscroll"><table class="t">
+        <tr><th>Lead</th><th>Step</th><th>Next send</th></tr>
+        ${inSeq.map(x=>`<tr class="${x.id?'rowlink':''}" ${x.id?`onclick="location.hash='#/lead/${x.id}'"`:''}>
+          <td><b>${x.name}</b></td>
+          <td><span class="chip acc">step ${x.step} / 5</span></td>
+          <td style="font-size:12px;color:var(--ink2)">${x.next}</td></tr>`).join('')}
+      </table></div>
+      <div class="cbody" style="border-top:1px solid var(--border)">
+        <div class="lbl" style="margin-bottom:8px">Booked-job reminder track</div>
+        <div style="font-size:12.5px;color:var(--ink2);line-height:1.7">
+          Confirmation text at booking → reminder evening before → “tech on the way” with name + ETA → post-job review request at 6 PM.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function vQuotes(){
+  return `
+  <div class="pghead"><div><h1 class="h1">Quote Recovery</h1><p class="sub">${fmt$(QUOTES.reduce((a,q)=>a+q.amount,0))} sitting in open quotes. Silence is where it dies — chase it.</p></div></div>
+  <div class="card"><div class="tscroll"><table class="t">
+    <tr><th>Quote</th><th>Customer / job</th><th>Amount</th><th>Days out</th><th>Close probability</th><th>Last contact</th><th>Suggested follow-up</th><th></th></tr>
+    ${QUOTES.map(q=>{
+      const done = S.reminded[q.id];
+      return `<tr>
+      <td class="mono" style="font-size:11.5px">${q.id}<br><span style="color:var(--ink3);font-size:10px">${q.sent}</span></td>
+      <td><b>${q.name}</b><br><span style="font-size:12px;color:var(--ink2)">${q.job}</span>${q.leadRef?` · <a href="#/lead/${q.leadRef}" style="font-size:11px">lead</a>`:''}</td>
+      <td class="num" style="font-weight:600">${fmt$(q.amount)}</td>
+      <td class="num" style="color:${q.days>=7?'var(--crit)':q.days>=3?'var(--warn)':'var(--ink2)'}">${q.days}d</td>
+      <td>${probBar(q.prob)}</td>
+      <td style="font-size:12px;color:var(--ink2)">${done?'Reminder sent just now':q.last}</td>
+      <td style="font-size:12px;color:var(--ink2);max-width:210px">${q.suggest}</td>
+      <td style="text-align:right"><button class="btn sm ${q.days>=7?'pri':''}" onclick="sendReminder('${q.id}')" ${done?'disabled':''}>${done?'Sent ✓':'Send reminder'}</button></td>
+    </tr>`}).join('')}
+  </table></div></div>
+  <p style="font-size:12px;color:var(--ink3);margin-top:10px">Close probability is estimated from days-since-sent, link opens, and reply history. In V0 it is a placeholder heuristic — challenge it.</p>`;
+}
+
+function vReporting(){
+  const max = Math.max(...REPORT.recovered);
+  const smax = Math.max(...REPORT.sources.map(s=>s[1]));
+  return `
+  <div class="pghead"><div><h1 class="h1">Reporting</h1><p class="sub">The Friday one-pager, live. Recovered = jobs that began as a missed call, dead-hour form, or stale quote.</p></div>
+  <div class="sp"></div><button class="btn" onclick="toast('<b>PDF exported.</b> (prototype)')">Export monthly PDF</button></div>
+  <div class="kpis">
+    <div class="kpi won"><div class="lbl">Revenue recovered · July</div><div class="v">${fmt$(18450)}</div><div class="d">11 booked jobs · avg ticket <b>$1,677</b></div></div>
+    <div class="kpi"><div class="lbl">Missed calls saved</div><div class="v">41 / 57</div><div class="d"><b>72%</b> of missed calls turned into a conversation</div></div>
+    <div class="kpi"><div class="lbl">Avg response time</div><div class="v">42s</div><div class="d">baseline before launch: <b>3h 20m</b></div></div>
+    <div class="kpi"><div class="lbl">Booked jobs · 30 days</div><div class="v">31</div><div class="d">conversion <b>38%</b> of qualified leads</div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="chead"><h3>Revenue recovered by month</h3><div class="sp"></div><span class="lbl">Feb – Jul 2026</span></div>
+      <div class="cbody chart">
+        <div class="cbars">
+          ${REPORT.months.map((m,i)=>{
+            const v=REPORT.recovered[i], h=Math.round(v/max*100);
+            return `<div class="cb ${i===REPORT.months.length-1?'hi':''}" data-tip="${m}: ${fmt$(v)}">
+              ${i===REPORT.months.length-1?`<div class="bv">${fmt$(v)}</div>`:''}
+              <div class="bar" style="height:${h}%"></div></div>`;
+          }).join('')}
+        </div>
+        <div class="cxl">${REPORT.months.map(m=>`<span>${m}</span>`).join('')}</div>
+        <details class="dtable"><summary>View as table</summary>
+          <table class="t"><tr><th>Month</th><th>Recovered</th></tr>
+          ${REPORT.months.map((m,i)=>`<tr><td>${m}</td><td class="num">${fmt$(REPORT.recovered[i])}</td></tr>`).join('')}</table>
+        </details>
+      </div></div>
+    <div class="card"><div class="chead"><h3>Lead sources</h3><div class="sp"></div><span class="lbl">last 30 days · count</span></div>
+      <div class="cbody chart">
+        <div class="hbars">
+          ${REPORT.sources.map(s=>`<div class="hb" data-tip="${s[0]}: ${s[1]} leads">
+            <span class="hl">${s[0]}</span>
+            <span class="tr"><span class="fl" style="width:${Math.round(s[1]/smax*100)}%"></span></span>
+            <span class="hv">${s[1]}</span></div>`).join('')}
+        </div>
+        <p style="font-size:12px;color:var(--ink2);margin:12px 0 0">“Missed calls” is a source here on purpose: 19 leads existed only because the missed-call text-back caught them.</p>
+      </div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="chead"><h3>Month over month</h3></div>
+    <div class="tscroll"><table class="t">
+      <tr><th>Month</th><th>Missed calls</th><th>Saved</th><th>Leads</th><th>Booked</th><th>Conversion</th><th>Recovered</th></tr>
+      ${[['Feb',44,24,58,15,'26%',6200],['Mar',51,31,66,19,'29%',8900],['Apr',49,33,71,23,'32%',11400],['May',55,38,80,27,'34%',14800],['Jun',58,40,88,30,'34%',16900],['Jul (to date)',57,41,95,31,'38%',18450]]
+        .map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td><td class="num">${r[5]}</td><td class="num" style="font-weight:600">${fmt$(r[6])}</td></tr>`).join('')}
+    </table></div></div>`;
+}
+
+function vSettings(){
+  const hours = [['Mon','7:00 AM – 5:00 PM'],['Tue','7:00 AM – 5:00 PM'],['Wed','7:00 AM – 5:00 PM'],['Thu','7:00 AM – 5:00 PM'],['Fri','7:00 AM – 4:00 PM'],['Sat','8:00 AM – 12:00 PM'],['Sun','Closed']];
+  return `
+  <div class="pghead"><div><h1 class="h1">Settings</h1><p class="sub">Everything the office controls. Changes here are what we’d configure together at onboarding.</p></div></div>
+  <div class="card"><div class="cbody set">
+    <div class="row"><div class="rl"><b>Business hours</b><span>Outside these hours, after-hours behavior takes over.</span></div>
+      <div>${hours.map(h=>`<div class="hoursrow"><span class="dy">${h[0]}</span><span class="mono" style="font-size:12px">${h[1]}</span></div>`).join('')}</div></div>
+
+    <div class="row"><div class="rl"><b>After-hours behavior</b><span>What happens when a call isn’t answered.</span></div>
+      <div>
+        <label class="radio on"><input type="radio" name="ah" checked><span><b>Text-back + guided conversation</b><span>Missed caller gets a text in ~20s; qualification questions run automatically; emergencies page the on-call phone.</span></span></label>
+        <label class="radio"><input type="radio" name="ah"><span><b>Text-back only</b><span>Send the missed-call text, collect replies, but wait for the office to respond in the morning.</span></span></label>
+        <label class="radio"><input type="radio" name="ah"><span><b>Voicemail only</b><span>Current behavior for most shops. Shown for comparison — this is the thing we’re replacing.</span></span></label>
+      </div></div>
+
+    <div class="row"><div class="rl"><b>Phone forwarding</b><span>Conditional forwarding — you answer like always; we only see calls you miss.</span></div>
+      <div style="font-size:13px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="chip good"><span class="dot"></span>Verified</span><span class="mono">(408) 555-0177 → no answer/busy → (408) 555-RRVY</span></div>
+        <button class="btn sm" onclick="toast('Test call placed to your line. Let it ring out and watch the text arrive.')">Run test call</button>
+      </div></div>
+
+    <div class="row"><div class="rl"><b>SMS templates</b><span>Your words, your tone. Every automated text comes from these.</span></div>
+      <div>
+        <div class="field"><span class="lbl">Missed-call text</span><textarea rows="2">Sorry we missed you — this is Reyes Plumbing & Rooter. Are you calling about a repair or an estimate? Reply here and we'll get right back to you.</textarea></div>
+        <div class="field"><span class="lbl">Quote reminder</span><textarea rows="2">Any questions on your quote? Happy to walk through line items, adjust scope, or set a start date.</textarea></div>
+        <button class="btn sm" onclick="toast('<b>Templates saved.</b>')">Save templates</button>
+      </div></div>
+
+    <div class="row"><div class="rl"><b>Calendar</b><span>Where booked jobs land.</span></div>
+      <div style="font-size:13px"><span class="chip good"><span class="dot"></span>Google Calendar · connected</span>
+      <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">Jobber / Housecall Pro / ServiceTitan sync planned — V0 books into a shared calendar the office already checks.</p></div></div>
+
+    <div class="row"><div class="rl"><b>Office users</b><span>Who can see and work leads.</span></div>
+      <div class="tscroll"><table class="t" style="max-width:560px">
+        <tr><th>Name</th><th>Role</th><th>Gets</th></tr>
+        <tr><td><b>Miguel Reyes</b></td><td>Owner</td><td style="font-size:12px;color:var(--ink2)">Emergency pages · daily digest · weekly report</td></tr>
+        <tr><td><b>Carla Reyes</b></td><td>Office Manager</td><td style="font-size:12px;color:var(--ink2)">All lead alerts · confirmation queue</td></tr>
+        <tr><td><b>J. Silva</b></td><td>Dispatcher / Lead Tech</td><td style="font-size:12px;color:var(--ink2)">Booked-job details · schedule changes</td></tr>
+      </table></div></div>
+
+    <div class="row"><div class="rl"><b>Notifications</b><span>When people get pinged.</span></div>
+      <div>
+        <label class="ckrow"><input type="checkbox" checked> Emergency lead (urgency ≥ 8) → SMS the on-call phone immediately</label>
+        <label class="ckrow"><input type="checkbox" checked> Appointment requested → text Office Manager for confirmation</label>
+        <label class="ckrow"><input type="checkbox" checked> Quote silent 7 days → flag on dashboard + morning digest</label>
+        <label class="ckrow"><input type="checkbox"> Every new lead → push notification (off — too noisy, digest instead)</label>
+      </div></div>
+  </div></div>`;
+}
+
+/* =================== flow sims =================== */
+const FLOW1 = [
+  {t:'9:42:03', phone:null, sys:{tt:'Inbound call — (408) 555-2214', dd:'After hours. Office line rings 25 seconds. Nobody answers. Today, this is where the job goes to the next company on Google.'}},
+  {t:'9:42:21', phone:{who:'us', txt:'Sorry we missed you — this is Reyes Plumbing & Rooter. Are you calling about a repair or an estimate? Reply here and we’ll get right back to you.'}, sys:{tt:'Text-back fired · T+18s', dd:'Sent from the business number the customer just dialed — not a random shortcode.'}},
+  {t:'9:44:10', phone:{who:'cust', txt:'No hot water since tonight. Water heater is pretty old'}, sys:{tt:'Customer engages', dd:'Lead L-1041 created automatically. Urgency scoring starts.'}},
+  {t:'9:44:31', phone:{who:'us', txt:'Got it — no hot water is no fun. Is there any water leaking around the base of the tank?'}, sys:{tt:'Qualification — safety first', dd:'Leak at the base would escalate to emergency page. Guided questions, one at a time.'}},
+  {t:'9:45:02', phone:{who:'cust', txt:'No leak that I can see'}, sys:null},
+  {t:'9:45:20', phone:{who:'us', txt:'Good. Gas or electric, roughly how old, and what’s the service address?'}, sys:{tt:'Collecting job details', dd:'Type, age, address → estimate range and van stock check become possible before the visit.'}},
+  {t:'9:47:44', phone:{who:'cust', txt:'Gas, maybe 11 years? 1170 Curtner Ave San Jose'}, sys:{tt:'Qualified · urgency 9/10', dd:'11-year-old gas tank, no hot water, family home. Est. ticket $2,400–$3,200.'}},
+  {t:'9:48:06', phone:{who:'us', txt:'Thanks Dana. We can have a tech out tomorrow morning — 8–10 AM or 10–12. Which works?'}, sys:{tt:'Appointment offer', dd:'Slots come from tomorrow’s real calendar availability. Two options — not an open-ended “when works for you?”'}},
+  {t:'9:50:12', phone:{who:'cust', txt:'8-10 works'}, sys:{tt:'Appointment requested', dd:'Held as UNCONFIRMED. V0 rule: a human confirms every booking before it’s promised.'}},
+  {t:'9:51:00', phone:{who:'us', txt:'Perfect — you’re penciled in for tomorrow 8–10 AM at 1170 Curtner Ave. Carla will text you first thing to confirm. Sleep well, Dana.'}, sys:{tt:'Office notified', dd:'SMS to on-call (owner) + confirmation task on Carla’s dashboard queue for 7 AM.'}},
+  {t:'7:05 AM', phone:null, sys:{tt:'Morning: office confirms in one tap', dd:'Carla opens “Needs attention,” taps Confirm & dispatch. Customer gets the confirmation text with tech name + ETA window.'}},
+  {t:'10:40 AM', phone:null, sys:{tt:'Revenue recovered — $2,800', dd:'Water heater replaced next morning. A 9:42 PM missed call became a paid job. That is the entire product.'}},
+];
+
+const FLOW2 = [
+  {t:'T+0s', phone:null, sys:{tt:'Website form submitted — 11:03 AM', dd:'“Warm spot on kitchen floor, water bill doubled.” Name, phone, address captured. Lead L-1042 created.'}},
+  {t:'T+8s', phone:null, sys:{tt:'Instant routing', dd:'Keyword pattern (warm floor + high bill) → possible slab leak → priority queue, not the generic pile.'}},
+  {t:'T+52s', phone:{who:'us', txt:'Hi Rosa, this is Reyes Plumbing — got your note about the warm spot and the water bill. That pattern can mean a slab leak. Quick q: any sound of running water when everything’s off?'}, sys:{tt:'First touch inside 60 seconds', dd:'The promise, kept: every web lead gets a real response in under a minute — while competitors send Monday emails.'}},
+  {t:'T+4m', phone:{who:'cust', txt:'Yes actually, a faint hiss near the kitchen'}, sys:{tt:'Qualification signal', dd:'Hiss + warm spot + bill spike = high confidence. Urgency 8/10.'}},
+  {t:'T+6m', phone:{who:'us', txt:'That’s useful. We’d start with electronic leak detection ($285, credited toward repair). Weekday afternoons OK if we call to set a time?'}, sys:{tt:'Price transparency up front', dd:'Detection fee stated in the thread — fewer no-shows, fewer surprises.'}},
+  {t:'T+6m', phone:{who:'cust', txt:'Yes afternoons work'}, sys:{tt:'Handoff to office', dd:'“Call to schedule leak detection (offer Wed PM)” appears in Needs Attention with the full thread attached.'}},
+  {t:'later', phone:null, sys:{tt:'Reminders armed', dd:'If the office doesn’t book within 4 business hours → nudge. If customer goes quiet → the 5-step sequence takes over. Nothing relies on memory.'}},
+];
+
+function vFlow(n){
+  const F = n===1?FLOW1:FLOW2;
+  const step = n===1?S.flow1:S.flow2;
+  const title = n===1?'Flow 1 — After-hours call, recovered':'Flow 2 — Website form, answered in 60 seconds';
+  const sub = n===1?'Thursday 9:42 PM. The office is closed. Walk through exactly what the customer and the system each see.':'A form fill during a busy morning. The 60-second promise, step by step.';
+  const shown = F.slice(0, step);
+  return `
+  <div class="pghead"><div><h1 class="h1">${title}</h1><p class="sub">${sub}</p></div>
+    <div class="sp"></div>
+    <span class="mono" style="font-size:11px;color:var(--ink2);align-self:center">step ${step} / ${F.length}</span>
+    <button class="btn" onclick="flowReset(${n})">Reset</button>
+    <button class="btn pri" id="advBtn" onclick="flowNext(${n})" ${step>=F.length?'disabled':''}>${step===0?'Start':step>=F.length?'Done':'Next step →'}</button>
+  </div>
+  <div class="sim">
+    <div class="phone">
+      <div class="pstat"><span>Customer’s phone</span><span>${n===1?'9:42 PM':'11:03 AM'}</span></div>
+      <div class="msgs">
+        ${shown.filter(s=>s.phone).map(s=>`
+          <div style="display:flex;flex-direction:column;align-items:${s.phone.who==='us'?'flex-start':'flex-end'}">
+            <span class="bubble ${s.phone.who==='us'?'cust':'us'}" style="${s.phone.who==='us'?'':'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)'}">${s.phone.txt}</span>
+            <span class="meta">${s.t}</span>
+          </div>`).join('') || '<div class="empty">No messages yet.<br>Press “Start”.</div>'}
+      </div>
+      <div style="font:9.5px/1.4 var(--mono);color:var(--ink3);text-align:center;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">gray = Reyes Plumbing · blue = customer</div>
+    </div>
+    <div class="log card"><div class="chead"><h3>What the system is doing</h3><div class="sp"></div><span class="lbl">business side</span></div>
+      <div class="cbody">
+        ${F.map((s,i)=>`
+          <div class="simstep ${i<step?'':'pending'}">
+            <span class="t">${s.t}</span>
+            <div>${s.sys?`<div class="tt">${s.sys.tt}</div><div class="dd">${s.sys.dd}</div>`:`<div class="dd" style="font-style:italic">customer replies…</div>`}</div>
+          </div>`).join('')}
+        ${step>=F.length?`<div style="margin-top:12px;display:flex;gap:8px">
+          <a class="btn pri" href="${n===1?'#/lead/L-1041':'#/lead/L-1042'}">Open this lead in the dashboard →</a>
+        </div>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =================== actions =================== */
+function sendReminder(qid){
+  S.reminded[qid]=true;
+  const q = QUOTES.find(x=>x.id===qid);
+  toast(`<b>Reminder sent</b> — ${q.name}, ${q.id} (${fmt$(q.amount)}). Reply lands in the lead thread.`);
+  route();
+}
+function confirmAppt(lid){
+  S.confirmed[lid]=true;
+  toast('<b>Confirmed & dispatched.</b> Dana gets: “You’re confirmed for 8–10 AM — Miguel will text when he’s 30 min out.”');
+  route();
+}
+function flowNext(n){ if(n===1){S.flow1=Math.min(S.flow1+1,FLOW1.length)} else {S.flow2=Math.min(S.flow2+1,FLOW2.length)} route(); }
+function flowReset(n){ if(n===1){S.flow1=0}else{S.flow2=0} route(); }
+
+/* =================== router =================== */
+function route(){
+  const h = location.hash || '#/dashboard';
+  const v = document.getElementById('view');
+  let html;
+  if(h.startsWith('#/lead/')) html = vLead(h.split('/')[2]);
+  else if(h.startsWith('#/leads')) html = vLeads();
+  else if(h.startsWith('#/quotes')) html = vQuotes();
+  else if(h.startsWith('#/followups')) html = vFollowups();
+  else if(h.startsWith('#/reporting')) html = vReporting();
+  else if(h.startsWith('#/settings')) html = vSettings();
+  else if(h.startsWith('#/flow1')) html = vFlow(1);
+  else if(h.startsWith('#/flow2')) html = vFlow(2);
+  else html = vDashboard();
+  v.innerHTML = html;
+  renderNav();
+  v.scrollTop = 0; window.scrollTo(0,0);
+}
+window.addEventListener('hashchange', route);
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  const r = document.documentElement;
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const cur = r.getAttribute('data-theme') || (dark?'dark':'light');
+  r.setAttribute('data-theme', cur==='dark'?'light':'dark');
+});
+route();
+</script>
