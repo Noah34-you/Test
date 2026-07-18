@@ -12,6 +12,7 @@ manually first, automate after ~5 clients, and productize only workflows custome
 | [`SCOREBOARD.md`](SCOREBOARD.md) | Running scoreboard of every idea we evaluate |
 | [`opportunities/`](opportunities/) | One deep-dive per idea (framework: problem → manual service → automation → SaaS) |
 | [`sales/`](sales/) | Cold emails, scripts, pricing, objection handling per offer |
+| [`prototype/`](prototype/) | **V0 exoskeleton** — clickable "Revenue Recovery" ops console (open `index.html` in any browser) + [`V0-REVIEW.md`](prototype/V0-REVIEW.md) persona teardown |
 | [`PLAYBOOK.md`](PLAYBOOK.md) | How we operate: rules, priorities, evaluation framework |
 
 ## Current state (2026-07-17)
